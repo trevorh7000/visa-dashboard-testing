@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import re
 from datetime import datetime
 
-import streamlit as st
 import streamlit.components.v1 as components
 
 # Your Google Tag Manager or Analytics snippet as a raw HTML string:
@@ -110,23 +109,8 @@ df = load_data()
 if df.empty:
     st.warning("No data found in database.")
 else:
-    summary = compute_stats(df)
 
-    # --- Charts and Table ---
-    with st.expander("📋 Show Weekly Summary Table", expanded=True):
-        st.dataframe(summary.drop(columns=["week_start_date"]))
-
-    show_chart(summary)
-
-    # --- Downloads ---
-    st.subheader("📥 Download Data")
-    csv_summary = summary.drop(columns=["week_start_date"]).to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
-
-    csv_full = df.to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
-
-    # --- Lookup ---
+    # --- Lookup moved to top ---
     st.subheader("🔎 Look Up Application Number")
     app_num = st.text_input("Enter Application Number (case insensitive):")
     if app_num:
@@ -136,3 +120,20 @@ else:
             st.table(results)
         else:
             st.error("No matching application number found.")
+    else:
+        # --- Show summary and charts only if no lookup query ---
+        summary = compute_stats(df)
+
+        # --- Charts and Table ---
+        with st.expander("📋 Show Weekly Summary Table", expanded=True):
+            st.dataframe(summary.drop(columns=["week_start_date"]))
+
+        show_chart(summary)
+
+        # --- Downloads ---
+        st.subheader("📥 Download Data")
+        csv_summary = summary.drop(columns=["week_start_date"]).to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
+
+        csv_full = df.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
