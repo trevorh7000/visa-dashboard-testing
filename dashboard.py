@@ -28,6 +28,16 @@ DB_PATH = "decisions.db"
 
 st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
 
+st.markdown("""
+    <style>
+    input {
+        background-color: #dcdee0!important;  /* soft but visible orange */
+        color: black !important;
+        border: 2px solid black !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 @st.cache_data
 def load_data():
     conn = sqlite3.connect(DB_PATH)
