@@ -21,7 +21,7 @@ GA_JS = """
   gtag('config', 'G-8ZMY8YCKVH');
 </script>
 """
-components.html(gtm_code)
+components.html(GA_JS)
 
 DB_PATH = "decisions.db"
 
