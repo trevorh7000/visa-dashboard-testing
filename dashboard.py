@@ -5,6 +5,18 @@ import matplotlib.pyplot as plt
 import re
 from datetime import datetime
 
+GA_JS = """
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZMY8YCKVH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8ZMY8YCKVH');
+</script>
+"""
+
 DB_PATH = "decisions.db"
 
 st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
