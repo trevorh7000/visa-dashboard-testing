@@ -7,6 +7,8 @@ from datetime import datetime
 
 import streamlit.components.v1 as components
 
+st.write("Changes: lookup moved to top")
+
 # Your Google Tag Manager or Analytics snippet as a raw HTML string:
 
 GA_JS = """
