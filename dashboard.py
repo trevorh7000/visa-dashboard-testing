@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 import re
 from datetime import datetime
 
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Your Google Tag Manager or Analytics snippet as a raw HTML string:
+
 GA_JS = """
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZMY8YCKVH"></script>
@@ -16,6 +21,7 @@ GA_JS = """
   gtag('config', 'G-8ZMY8YCKVH');
 </script>
 """
+components.html(gtm_code)
 
 DB_PATH = "decisions.db"
 
