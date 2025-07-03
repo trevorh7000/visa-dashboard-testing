@@ -7,7 +7,7 @@ from datetime import datetime
 
 import streamlit.components.v1 as components
 
-st.write("Changes: lookup moved to top")
+
 
 # Your Google Tag Manager or Analytics snippet as a raw HTML string:
 
@@ -135,10 +135,11 @@ else:
     else:
         # --- Show summary and charts only if no lookup query ---
         summary = compute_stats(df)
+        summary_for_table = summary.sort_values("week_start_date", ascending=False).reset_index(drop=True)
 
         # --- Charts and Table ---
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(summary.drop(columns=["week_start_date"]))
+            st.dataframe(summary_for_table.drop(columns=["week_start_date"]))
 
         show_chart(summary)
 
@@ -149,3 +150,6 @@ else:
 
         csv_full = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
+
+st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
+st.write("Dash board created by T Cubed - tghughes@gmail.com")
