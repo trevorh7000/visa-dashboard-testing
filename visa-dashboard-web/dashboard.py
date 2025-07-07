@@ -10,9 +10,10 @@ import streamlit.components.v1 as components
 
 # --- Read message.txt ---
 message_path = "message.txt"
-
-if os.path.exists(message_path):
-    with open(message_path, "r") as f:
+BASE_DIR = os.path.dirname(__file__)
+MSG_PATH = os.path.join(BASE_DIR, "message.txt")
+if os.path.exists(MSG_PATH):
+    with open(MSG_PATH, "r") as f:
         message = f.read().strip()  # strip removes leading/trailing blank lines
 
     # --- Display with smaller boxed style ---
