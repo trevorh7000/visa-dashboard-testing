@@ -5,8 +5,16 @@ import os
 
 # Configuration
 BASE_URL = "https://www.irishimmigration.ie/south-africa-visa-desk/#tourist"
-OUTPUT_DIR = "pdf"  # CHANGE THIS to your actual download path
-LOG_FILE = os.path.join(OUTPUT_DIR, "downloaded_pdfs.txt")
+
+# Get current script directory (whether you're in data_pipline or streamlit app)
+BASE_DIR = os.path.dirname(__file__)
+
+# Path to ../data/downloaded_pdfs.txt
+LOG_FILE = os.path.abspath(os.path.join(BASE_DIR, "..", "data", "pdf", "downloaded_pdfs.txt"))
+print("LOG_FILE path (resolved):", os.path.abspath(LOG_FILE))
+# Path to where doanloaded PDFs will be saved
+OUTPUT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "pdf"))
+
 
 def fetch_pdf_links():
     """Fetch all PDF links from the target site using browser-like headers."""
@@ -32,6 +40,9 @@ def load_downloaded_log():
     return set()
 
 def save_downloaded_log(downloaded):
+    # Ensure the parent directory exists
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
     with open(LOG_FILE, "w") as f:
         for item in sorted(downloaded):
             f.write(item + "\n")
