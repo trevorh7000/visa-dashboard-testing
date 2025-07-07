@@ -1,0 +1,5 @@
+Extracted 126 rows from SAVD-Decisions-17-June-to-23-June-2025.pdf - Inserted 0 new records.
+Extracted 133 rows from SAVD-Decisions-10-June-to-16-June-2025.pdf - Inserted 0 new records.
+Extracted 70 rows from SAVD-Decisions-27-May-to-02-June-2025.pdf - Inserted 0 new records.
+Extracted 156 rows from SAVD-Decisions-03-June-to-09-June-2025.pdf - Inserted 0 new records.
+Extracted 199 rows from SAVD-Decisions-24-June-to-30-June-2025.pdf - Inserted 0 new records.

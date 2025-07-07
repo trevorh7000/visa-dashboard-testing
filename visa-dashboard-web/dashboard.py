@@ -4,25 +4,35 @@ import sqlite3
 import matplotlib.pyplot as plt
 import re
 from datetime import datetime
+import os
 
 import streamlit.components.v1 as components
 
+# --- Read message.txt ---
+message_path = "message.txt"
 
+if os.path.exists(message_path):
+    with open(message_path, "r") as f:
+        message = f.read().strip()  # strip removes leading/trailing blank lines
 
-# Your Google Tag Manager or Analytics snippet as a raw HTML string:
-
-GA_JS = """
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-8ZMY8YCKVH"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-8ZMY8YCKVH');
-</script>
-"""
-components.html(GA_JS)
+    # --- Display with smaller boxed style ---
+    st.markdown("Status Message")
+    st.markdown(f"""
+    <div style="
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        font-family: monospace;
+        font-size: 50%;
+        white-space: pre-wrap;
+        line-height: 1.4;
+    ">
+{message}
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.info("No update message found yet.")
 
 DB_PATH = "decisions.db"
 

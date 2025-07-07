@@ -1,16 +1,26 @@
 import os
 import re
-import csv
-import pdfplumber
 import sqlite3
-from datetime import datetime
+import shutil
+import pdfplumber
 
 # === FOLDER SETUP ===
-PDF_DIR = os.path.expanduser("~/Documents/FGW/pdf")  # where PDFs and new_pdfs.txt are
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # location of this script
-DB_PATH = os.path.join(SCRIPT_DIR, "decisions.db")
-NEW_LIST_FILE = os.path.join(PDF_DIR, "new_pdfs.txt")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TO_PROCESS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "data", "pdf", "to_process"))
+PROCESSED_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "data", "pdf", "processed"))
+APP_PATH = os.path.join(SCRIPT_DIR, "..", "visa-dashboard-web") 
+DB_PATH = os.path.join(APP_PATH, "decisions.db")
+MESSAGE_FILE = os.path.join(APP_PATH, "message.txt")
 
+# clearing out messgae.tx at start
+with open(MESSAGE_FILE, "w") as f:
+    pass  # This will clear the file if it exists, or create it if not
+
+
+# === Write Message ===
+def write_message(message):
+    with open(MESSAGE_FILE, "a") as f:
+        f.write(message)
 
 # === DATABASE SETUP ===
 def init_db(db_path):
@@ -33,7 +43,6 @@ def init_db(db_path):
 
 # === FILENAME PARSING ===
 def extract_week_label(filename):
-    # Match things like SAVD-Decisions-24-June-to-30-June-2025.pdf
     match = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+-\d{4})", filename)
     if match:
         start, end = match.groups()
@@ -51,12 +60,13 @@ def process_pdf(filepath, week_label):
             if not table:
                 continue
             for row in table:
-                # Skip headers
                 if "Application Number" in row[0] or "Decision" in row[1]:
                     continue
                 if row[0] and row[1]:
                     rows.append([row[0].strip(), row[1].strip()])
-    print(f"Extracted {len(rows)} rows from {os.path.basename(filepath)}")
+    text_to_go = f"Extracted {len(rows)} rows from {os.path.basename(filepath)}"
+    print(text_to_go)
+    write_message(text_to_go) # write the stats to display on app!
     return rows
 
 
@@ -75,44 +85,36 @@ def insert_into_db(conn, rows, week, filename):
         except Exception as e:
             print(f"Error inserting row: {row} | {e}")
     conn.commit()
-    print(f"Inserted {new_rows} new records.")
-
+    text_to_go = (f"Inserted {new_rows} new records.")
+    print(text_to_go)
+    write_message(' - '+text_to_go+'\n')
 
 # === MAIN LOGIC ===
 def main():
-    if not os.path.exists(NEW_LIST_FILE):
-        print("No new_pdfs.txt file found.")
-        return
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    os.makedirs(TO_PROCESS_DIR, exist_ok=True)
 
-    with open(NEW_LIST_FILE, "r") as f:
-        pending_urls = [line.strip() for line in f if line.strip()]
-
-    if not pending_urls:
-        print("No new PDFs listed.")
+    files = [f for f in os.listdir(TO_PROCESS_DIR) if f.lower().endswith(".pdf")]
+    if not files:
+        print("No PDFs to process.")
         return
 
     conn = init_db(DB_PATH)
 
-    for url in pending_urls[:]:  # work on a copy for safe removal
-        filename = os.path.basename(url)
-        filepath = os.path.join(PDF_DIR, filename)
-
-        if not os.path.exists(filepath):
-            print(f"Missing local file, skipping: {filename}")
-            continue
+    for filename in files:
+        filepath = os.path.join(TO_PROCESS_DIR, filename)
 
         print(f"\nProcessing {filename}")
         week_label = extract_week_label(filename)
         rows = process_pdf(filepath, week_label)
         insert_into_db(conn, rows, week_label, filename)
 
-        # Remove processed entry from list
-        pending_urls.remove(url)
-        with open(NEW_LIST_FILE, "w") as f:
-            for remaining in pending_urls:
-                f.write(remaining + "\n")
+        # Move processed file to "processed"
+        dest_path = os.path.join(PROCESSED_DIR, filename)
+        shutil.move(filepath, dest_path)
+        print(f"Moved to processed: {filename}")
 
-    print("\nDone. All new PDFs processed.")
+    print("\nDone. All PDFs processed.")
 
 
 if __name__ == "__main__":
