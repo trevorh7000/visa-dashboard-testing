@@ -50,7 +50,11 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    conn = sqlite3.connect(DB_PATH)
+    import os
+    BASE_DIR = os.path.dirname(__file__)
+    db_path = os.path.join(BASE_DIR, "decisions.db")
+    conn = sqlite3.connect(db_path)
+
     df = pd.read_sql_query("SELECT app_number, decision, week FROM decisions", conn)
     conn.close()
     df = df.rename(columns={"app_number": "application_number"})
