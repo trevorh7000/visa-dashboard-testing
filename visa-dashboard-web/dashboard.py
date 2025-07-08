@@ -112,8 +112,6 @@ def show_chart(summary):
 st.title("📊 Visa Decisions Dashboard")
 
 # add the logo and text
-# Create two columns with a tighter gap
-col1, col2 = st.columns([0.1, 0.9])  # rough ratio to start with
 
 # Create two columns with approximate widths
 col1, col2 = st.columns([1, 5])
