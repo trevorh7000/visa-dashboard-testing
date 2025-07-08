@@ -112,12 +112,14 @@ def show_chart(summary):
 st.title("📊 Visa Decisions Dashboard")
 
 # add the logo and text
+logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-160.png")
+
 
 # Create two columns with approximate widths
 col1, col2 = st.columns([1, 5])
 
 with col1:
-    st.image("BISA-Logo-160.png", width=160)
+    st.image(logo_path, width=160)
 
 with col2:
     st.markdown(
