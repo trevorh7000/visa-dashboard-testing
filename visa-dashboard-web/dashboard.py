@@ -111,29 +111,42 @@ def show_chart(summary):
 
 st.title("📊 Visa Decisions Dashboard")
 
-# add the logo and text
-logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-160.png")
+# # add the logo and text
+logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-250.png")
+
+# image from github so it ca be centred
 
 
-# Create two columns with approximate widths
-col1, col2 = st.columns([1, 5])
+st.markdown("""
+    <style>
+        .centered {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+        }
+    </style>
+    <div class="centered">
+        <img src='https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-160.png'
+    </div>
+""", unsafe_allow_html=True)
 
-with col1:
-    st.image(logo_path, width=160)
-
-with col2:
+# Centered text with hyperlink
+left_co, cent_co,last_co = st.columns(3)
+with cent_co:
     st.markdown(
-        """
-        <div style="display: flex; align-items: center; height: 160px; margin-left: -20px;">
-            <p style="margin: 0; font-size: 1.1rem;">
-                <strong>Brought to you by Business Ireland South Africa</strong>
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
+    """
+    <div style="text-align: center; margin-top: 10px;">
+        Compiled by <a href="https://businessirelandsouthafrica.co.za/" target="_blank">Business Ireland South Africa</a>
+    </div>
+    """,
+    unsafe_allow_html=True
     )
 
 
+
+
+# ----------------------------------- new try  ----------------------------------
 df = load_data()
 if df.empty:
     st.warning("No data found in database.")
