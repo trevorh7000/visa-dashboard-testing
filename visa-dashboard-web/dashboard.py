@@ -12,28 +12,7 @@ import streamlit.components.v1 as components
 message_path = "message.txt"
 BASE_DIR = os.path.dirname(__file__)
 MSG_PATH = os.path.join(BASE_DIR, "message.txt")
-if os.path.exists(MSG_PATH):
-    with open(MSG_PATH, "r") as f:
-        message = f.read().strip()  # strip removes leading/trailing blank lines
 
-    # --- Display with smaller boxed style ---
-    st.markdown("Status Message")
-    st.markdown(f"""
-    <div style="
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 10px;
-        background-color: #f9f9f9;
-        font-family: monospace;
-        font-size: 50%;
-        white-space: pre-wrap;
-        line-height: 1.4;
-    ">
-{message}
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("No update message found yet.")
 
 DB_PATH = "decisions.db"
 
@@ -132,6 +111,29 @@ def show_chart(summary):
 
 st.title("📊 Visa Decisions Dashboard")
 
+# add the logo and text
+# Create two columns with a tighter gap
+col1, col2 = st.columns([0.1, 0.9])  # rough ratio to start with
+
+# Create two columns with approximate widths
+col1, col2 = st.columns([1, 5])
+
+with col1:
+    st.image("BISA-Logo-160.png", width=160)
+
+with col2:
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; height: 160px; margin-left: -20px;">
+            <p style="margin: 0; font-size: 1.1rem;">
+                <strong>Brought to you by Business Ireland South Africa</strong>
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 df = load_data()
 if df.empty:
     st.warning("No data found in database.")
@@ -168,3 +170,26 @@ else:
 
 st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
 st.write("Dash board created by T Cubed - tghughes@gmail.com")
+
+if os.path.exists(MSG_PATH):
+    with open(MSG_PATH, "r") as f:
+        message = f.read().strip()  # strip removes leading/trailing blank lines
+
+    # --- Display with smaller boxed style ---
+    st.markdown("Status Message")
+    st.markdown(f"""
+    <div style="
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        font-family: monospace;
+        font-size: 50%;
+        white-space: pre-wrap;
+        line-height: 1.4;
+    ">
+{message}
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.info("No update message found yet.")
