@@ -127,7 +127,7 @@ st.markdown("""
         }
     </style>
     <div class="centered">
-        <img src='https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-160.png'
+        <img src='https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
     </div>
 """, unsafe_allow_html=True)
 
