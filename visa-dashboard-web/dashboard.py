@@ -16,7 +16,7 @@ MSG_PATH = os.path.join(BASE_DIR, "message.txt")
 
 DB_PATH = "decisions.db"
 
-st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
+st.set_page_config(page_title="Visa Decisions Dashboard TESTING", layout="wide")
 
 st.markdown("""
     <style>
@@ -109,7 +109,7 @@ def show_chart(summary):
 
 # === MAIN APP ===
 
-st.title("📊 Visa Decisions Dashboard")
+st.title("📊 Visa Decisions Dashboard TESTING")
 
 # # add the logo and text
 logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-250.png")
