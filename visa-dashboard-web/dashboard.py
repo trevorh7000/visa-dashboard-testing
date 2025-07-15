@@ -30,7 +30,7 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    # Returned to full data set
+    # cache bust
     import os
     BASE_DIR = os.path.dirname(__file__)
     db_path = os.path.join(BASE_DIR, "decisions.db")
