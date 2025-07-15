@@ -110,7 +110,7 @@ def show_chart(summary):
 
 # === MAIN APP ===
 
-st.title("📊 Visa Decisions Dashboard TESTING")
+st.title("📊 Visa Decisions Dashboard TESTING in the cloud!")
 
 # # add the logo and text
 logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-250.png")
