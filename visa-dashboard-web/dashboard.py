@@ -16,7 +16,7 @@ MSG_PATH = os.path.join(BASE_DIR, "message.txt")
 
 DB_PATH = "decisions.db"
 
-st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
+st.set_page_config(page_title="Visa Decisions Dashboard TESTTING", layout="wide")
 
 st.markdown("""
     <style>
