@@ -1,1 +1,1 @@
-Extracted 389 rows from SAVD-Decisions-08-July-to-14-July.pdf - Inserted 389 new records.
+Redacted some data as a test for updating
