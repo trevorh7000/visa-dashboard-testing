@@ -30,7 +30,7 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    # update to force reload of app
+    # update to force reload of app UPDATE
     import os
     BASE_DIR = os.path.dirname(__file__)
     db_path = os.path.join(BASE_DIR, "decisions.db")
