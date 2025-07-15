@@ -3,6 +3,7 @@ import re
 import sqlite3
 import shutil
 import pdfplumber
+import re
 
 # === FOLDER SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,13 +43,22 @@ def init_db(db_path):
 
 
 # === FILENAME PARSING ===
-def extract_week_label(filename):
-    match = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+-\d{4})", filename)
-    if match:
-        start, end = match.groups()
-        return f"{start}-to-{end}"
-    return "Unknown-Week"
 
+
+def extract_week_label(filename):
+    # Match with year at the end
+    match_with_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+-\d{4})", filename)
+    if match_with_year:
+        start, end = match_with_year.groups()
+        return f"{start}-to-{end}"
+
+    # Match without year
+    match_without_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+)", filename)
+    if match_without_year:
+        start, end = match_without_year.groups()
+        return f"{start}-to-{end}"
+
+    return "Unknown-Week"
 
 # === PDF PARSING ===
 def process_pdf(filepath, week_label):
@@ -119,3 +129,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+# === END OF FILE ===
+# This script processes PDF files, extracts data, and stores it in a SQLite database.   
+# It also manages file organization by moving processed files to a separate directory.
+# It writes messages to a text file for display in the web app.
+# === END OF FILE ===
