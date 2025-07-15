@@ -30,7 +30,7 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    # update to force reload of app UPDATE new records added 1-7 july 2025
+    # update to force reload of app UPDATE new records added 8-14 july 2025
     import os
     BASE_DIR = os.path.dirname(__file__)
     db_path = os.path.join(BASE_DIR, "decisions.db")
