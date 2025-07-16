@@ -66,8 +66,51 @@ def compute_stats(df):
     summary = summary.sort_values("week_start_date").reset_index(drop=True)
     return summary
 
+def show_chart_matplotlib(summary):
+    weeks = summary["week"]
+    approved = summary.get("Approved", pd.Series([0]*len(weeks)))
+    refused = summary.get("Refused", pd.Series([0]*len(weeks)))
+    total = summary["Total"]
+    refused_pct = summary["Refused %"]
+    approved_pct = 100 - refused_pct
 
-def show_chart(summary):
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    bar1 = ax.bar(weeks, approved, label="Approved", color="green")
+    bar2 = ax.bar(weeks, refused, label="Refused", color="red", bottom=approved)
+
+    for rect, pct in zip(bar1, approved_pct):
+        height = rect.get_height()
+        if height > 0:
+            ax.annotate(f'{int(height)} ({pct:.1f}%)',
+                        xy=(rect.get_x() + rect.get_width() / 2, height / 2),
+                        ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+
+    for rect, base_height, pct in zip(bar2, approved, refused_pct):
+        height = rect.get_height()
+        if height > 0:
+            ax.annotate(f'{int(height)} ({pct:.1f}%)',
+                        xy=(rect.get_x() + rect.get_width() / 2, base_height + height / 2),
+                        ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+
+    for i, tot in enumerate(total):
+        ax.annotate(f'Total: {int(tot)}',
+                    xy=(i, tot),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    fontsize=9, fontweight='bold')
+
+    ax.set_title("Visa Decisions per Week")
+    ax.set_ylabel("Number of Applications")
+    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, axis='y')
+    ax.legend()
+    fig.tight_layout()
+    st.pyplot(fig)
+
+
+def show_chart_plotly(summary):
     weeks = summary["week"]
     approved = summary.get("Approved", pd.Series([0]*len(weeks)))
     refused = summary.get("Refused", pd.Series([0]*len(weeks)))
@@ -195,10 +238,15 @@ else:
         summary_for_table = summary.sort_values("week_start_date", ascending=False).reset_index(drop=True)
 
         # --- Charts and Table ---
-        with st.expander("📋 Show Weekly Summary Table", expanded=True):
+        with st.expander("📋 Show Weekly Summary Table", expanded=False):
             st.dataframe(summary_for_table.drop(columns=["week_start_date"]))
 
-        show_chart(summary)
+        choice = st.radio("Choose chart type:", ("Matplotlib", "Plotly"))
+
+        if choice == "Matplotlib":
+            show_chart_matplotlib(summary)
+        else:
+            show_chart_plotly(summary)
 
         # --- Downloads ---
         st.subheader("📥 Download Data")
