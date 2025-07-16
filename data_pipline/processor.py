@@ -1,26 +1,44 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Processor for South Africa Visa Desk PDF data.
+This script processes downloaded PDFs, extracts data, and updates
+the Streamlit dashboard with new records.
+"""
+
 import os
 import re
 import sqlite3
 import shutil
 import pdfplumber
-import re
+from datetime import datetime
+import subprocess
 
-# === FOLDER SETUP ===
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TO_PROCESS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "data", "pdf", "to_process"))
-PROCESSED_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "data", "pdf", "processed"))
-APP_PATH = os.path.join(SCRIPT_DIR, "..", "visa-dashboard-web") 
-DB_PATH = os.path.join(APP_PATH, "decisions.db")
-MESSAGE_FILE = os.path.join(APP_PATH, "message.txt")
+import logging
+logger = logging.getLogger(__name__)
 
-# clearing out messgae.tx at start
-with open(MESSAGE_FILE, "w") as f:
-    pass  # This will clear the file if it exists, or create it if not
+# === wrapping: moved global setup into a function
+def setup():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    to_process_dir = os.path.abspath(os.path.join(script_dir, "..", "data", "pdf", "to_process"))
+    processed_dir = os.path.abspath(os.path.join(script_dir, "..", "data", "pdf", "processed"))
+    app_path = os.path.join(script_dir, "..", "visa-dashboard-web") 
+    db_path = os.path.join(app_path, "decisions.db")
+    message_file = os.path.join(app_path, "message.txt")
+    
+    os.makedirs(to_process_dir, exist_ok=True)
+    os.makedirs(processed_dir, exist_ok=True)
+
+    # Clear message file
+    with open(message_file, "w") as f:
+        pass
+
+    return to_process_dir, processed_dir, app_path, db_path, message_file
+# === end wrapping
 
 
 # === Write Message ===
-def write_message(message):
-    with open(MESSAGE_FILE, "a") as f:
+def write_message(message, message_file):
+    with open(message_file, "a") as f:
         f.write(message)
 
 # === DATABASE SETUP ===
@@ -41,18 +59,13 @@ def init_db(db_path):
     conn.commit()
     return conn
 
-
 # === FILENAME PARSING ===
-
-
 def extract_week_label(filename):
-    # Match with year at the end
     match_with_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+-\d{4})", filename)
     if match_with_year:
         start, end = match_with_year.groups()
         return f"{start}-to-{end}"
 
-    # Match without year
     match_without_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+)", filename)
     if match_without_year:
         start, end = match_without_year.groups()
@@ -61,7 +74,7 @@ def extract_week_label(filename):
     return "Unknown-Week"
 
 # === PDF PARSING ===
-def process_pdf(filepath, week_label):
+def process_pdf(filepath, week_label, message_file):
     rows = []
     with pdfplumber.open(filepath) as pdf:
         for page_number, page in enumerate(pdf.pages, start=1):
@@ -76,12 +89,11 @@ def process_pdf(filepath, week_label):
                     rows.append([row[0].strip(), row[1].strip()])
     text_to_go = f"Extracted {len(rows)} rows from {os.path.basename(filepath)}"
     print(text_to_go)
-    write_message(text_to_go) # write the stats to display on app!
+    write_message(text_to_go, message_file)
     return rows
 
-
 # === DATABASE INSERT ===
-def insert_into_db(conn, rows, week, filename):
+def insert_into_db(conn, rows, week, filename, message_file):
     cur = conn.cursor()
     new_rows = 0
     for row in rows:
@@ -95,43 +107,93 @@ def insert_into_db(conn, rows, week, filename):
         except Exception as e:
             print(f"Error inserting row: {row} | {e}")
     conn.commit()
-    text_to_go = (f"Inserted {new_rows} new records.")
+    text_to_go = f"Inserted {new_rows} new records."
     print(text_to_go)
-    write_message(' - '+text_to_go+'\n')
+    write_message(' - ' + text_to_go + '\n', message_file)
+    return new_rows
 
-# === MAIN LOGIC ===
-def main():
-    os.makedirs(PROCESSED_DIR, exist_ok=True)
-    os.makedirs(TO_PROCESS_DIR, exist_ok=True)
+# === STREAMLIT UPDATE ROUTINE ===
+def update_dashboard(app_path):
+    dashboard_path = os.path.join(app_path, "dashboard.py")
+    with open(dashboard_path, "r") as f:
+        lines = f.readlines()
 
-    files = [f for f in os.listdir(TO_PROCESS_DIR) if f.lower().endswith(".pdf")]
+    for i, line in enumerate(lines):
+        if line.strip().startswith("# cache-bust"):
+            lines[i] = f"# cache-bust: {datetime.now().isoformat()}\n"
+            break
+
+    with open(dashboard_path, "w") as f:
+        f.writelines(lines)
+
+    print("✅ Updated dashboard.py with new cache-bust comment.")
+    logger.info("Updated dashboard.py with new cache-bust comment.")
+
+# === GIT COMMIT & PUSH ===
+# === GIT COMMIT & PUSH ===
+def commit_and_push_updates(app_path):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    commit_msg = f"Auto update from processor script @ {timestamp}"
+    files = ["dashboard.py", "decisions.db", "message.txt"]
+
+    try:
+        for fname in files:
+            subprocess.run(["git", "add", fname], cwd=app_path, check=True)
+        subprocess.run(["git", "commit", "-m", commit_msg], cwd=app_path, check=True)
+        subprocess.run(["git", "push"], cwd=app_path, check=True)
+        print(f"✅ Git commit and push complete: {commit_msg}")
+        logger.info(f"Git commit and push complete: {commit_msg}")
+    except subprocess.CalledProcessError as e:
+        print("❌ Git operation failed:", e)
+        logger.error(f"Git operation failed: {e}")
+
+def update_streamlit_data(app_path):
+    update_dashboard(app_path)
+    commit_and_push_updates(app_path)
+
+# === wrapping: clean entry point function
+def run_processor():
+    to_process_dir, processed_dir, app_path, db_path, message_file = setup()
+    total_new_rows = 0
+    files = [f for f in os.listdir(to_process_dir) if f.lower().endswith(".pdf")]
     if not files:
         print("No PDFs to process.")
-        return
+        logger.info("No PDFs to process.")
+        return 0
 
-    conn = init_db(DB_PATH)
+    conn = init_db(db_path)
 
     for filename in files:
-        filepath = os.path.join(TO_PROCESS_DIR, filename)
-
+        filepath = os.path.join(to_process_dir, filename)
         print(f"\nProcessing {filename}")
         week_label = extract_week_label(filename)
-        rows = process_pdf(filepath, week_label)
-        insert_into_db(conn, rows, week_label, filename)
+        rows = process_pdf(filepath, week_label, message_file)
+        inserted_rows = insert_into_db(conn, rows, week_label, filename, message_file)
+        total_new_rows += inserted_rows
 
-        # Move processed file to "processed"
-        dest_path = os.path.join(PROCESSED_DIR, filename)
+        dest_path = os.path.join(processed_dir, filename)
         shutil.move(filepath, dest_path)
         print(f"Moved to processed: {filename}")
 
     print("\nDone. All PDFs processed.")
 
+    if total_new_rows > 0:
+        write_message(f"Total new records inserted: {total_new_rows}\n", message_file)
+        print(f"Total new records inserted: {total_new_rows}")
+        logger.info(f"Total new records inserted: {total_new_rows}")
+        update_streamlit_data(app_path)
+        print("Streamlit data updated.")
+    else:
+        write_message("No new records inserted.\n", message_file)
+        print("No new records inserted.")
+        logger.info("No new records inserted.")
 
-if __name__ == "__main__":
-    main()
     
-# === END OF FILE ===
-# This script processes PDF files, extracts data, and stores it in a SQLite database.   
-# It also manages file organization by moving processed files to a separate directory.
-# It writes messages to a text file for display in the web app.
-# === END OF FILE ===
+    return total_new_rows
+# === end wrapping
+
+# === safe CLI entry
+if __name__ == "__main__":
+    print ("Starting processor script...",datetime.now().isoformat())
+    run_processor()
+# === end wrapping
