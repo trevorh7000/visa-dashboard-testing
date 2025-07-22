@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/home/trev/python/new_dev/bin/python3
 # -*- coding: utf-8 -*-
 """
 Main entry point for the data pipeline to scrape, process, and update the visa decisions database.
@@ -6,9 +6,18 @@ This script orchestrates the scraping of PDF links, processing of those PDFs,
 and updating the Streamlit dashboard with new data.
 """
 
+# /home/trev/Dropbox/programming/python/visa_dashboard_app/data_pipline/main.py
+
+
 from scraper import run_scraper
 from processor import run_processor
 import logging
+import os
+import sys
+
+# Change working directory to the script's directory
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 def setup_logging(debug=False):
     level = logging.DEBUG if debug else logging.INFO
