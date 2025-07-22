@@ -10,7 +10,7 @@ import re
 import sqlite3
 import shutil
 import pdfplumber
-from datetime import datetime
+from datetime import datetime, date
 import subprocess
 
 import logging
@@ -51,6 +51,8 @@ def init_db(db_path):
             app_number TEXT NOT NULL,
             decision TEXT NOT NULL,
             week TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL, 
             filename TEXT NOT NULL,
             date_added TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(app_number, week)
@@ -59,19 +61,45 @@ def init_db(db_path):
     conn.commit()
     return conn
 
+
 # === FILENAME PARSING ===
-def extract_week_label(filename):
-    match_with_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+-\d{4})", filename)
+def extract_week_label(filename, today=None):
+    if today is None:
+        today = date.today()
+
+    # With year explicitly in the filename
+    match_with_year = re.search(r"SAVD-Decisions-(\d{1,2})-([A-Za-z]+)-to-(\d{1,2})-([A-Za-z]+)-(\d{4})", filename)
     if match_with_year:
-        start, end = match_with_year.groups()
-        return f"{start}-to-{end}"
+        d1, m1, d2, m2, y = match_with_year.groups()
+        start_date = datetime.strptime(f"{d1}-{m1}-{y}", "%d-%B-%Y").date()
+        end_date = datetime.strptime(f"{d2}-{m2}-{y}", "%d-%B-%Y").date()
+        week_label = f"{start_date.strftime('%d %b')} to {end_date.strftime('%d %b %Y')}"
+        return week_label, start_date, end_date
 
-    match_without_year = re.search(r"SAVD-Decisions-(\d{1,2}-[A-Za-z]+)-to-(\d{1,2}-[A-Za-z]+)", filename)
+    # Without year in the filename — infer the year
+    match_without_year = re.search(r"SAVD-Decisions-(\d{1,2})-([A-Za-z]+)-to-(\d{1,2})-([A-Za-z]+)", filename)
     if match_without_year:
-        start, end = match_without_year.groups()
-        return f"{start}-to-{end}"
+        d1, m1, d2, m2 = match_without_year.groups()
 
-    return "Unknown-Week"
+        try:
+            end_try = datetime.strptime(f"{d2}-{m2}-{today.year}", "%d-%B-%Y").date()
+        except ValueError:
+            return None, None, "Invalid-Date"
+
+        if end_try > today:
+            year = today.year - 1
+        else:
+            year = today.year
+
+        start_date = datetime.strptime(f"{d1}-{m1}-{year}", "%d-%B-%Y").date()
+        end_date = datetime.strptime(f"{d2}-{m2}-{year}", "%d-%B-%Y").date()
+
+        if end_date < start_date:
+            end_date = end_date.replace(year=year + 1)
+
+        week_label = f"{start_date.strftime('%d %b')} to {end_date.strftime('%d %b %Y')}"
+        return  week_label, start_date, end_date
+    return None, None, "Unknown-Week"
 
 # === PDF PARSING ===
 def process_pdf(filepath, week_label, message_file):
@@ -93,15 +121,15 @@ def process_pdf(filepath, week_label, message_file):
     return rows
 
 # === DATABASE INSERT ===
-def insert_into_db(conn, rows, week, filename, message_file):
+def insert_into_db(conn, rows, week, start_date, end_date, filename, message_file):
     cur = conn.cursor()
     new_rows = 0
     for row in rows:
         try:
             cur.execute("""
-                INSERT OR IGNORE INTO decisions (app_number, decision, week, filename)
-                VALUES (?, ?, ?, ?)
-            """, (row[0], row[1], week, filename))
+                INSERT OR IGNORE INTO decisions (app_number, decision, week, start_date, end_date, filename)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (row[0], row[1], week, start_date, end_date, filename))
             if cur.rowcount > 0:
                 new_rows += 1
         except Exception as e:
@@ -166,9 +194,9 @@ def run_processor():
     for filename in files:
         filepath = os.path.join(to_process_dir, filename)
         print(f"\nProcessing {filename}")
-        week_label = extract_week_label(filename)
+        week_label, start_date, end_date = extract_week_label(filename)
         rows = process_pdf(filepath, week_label, message_file)
-        inserted_rows = insert_into_db(conn, rows, week_label, filename, message_file)
+        inserted_rows = insert_into_db(conn, rows, week_label, start_date, end_date, filename, message_file)
         total_new_rows += inserted_rows
 
         dest_path = os.path.join(processed_dir, filename)

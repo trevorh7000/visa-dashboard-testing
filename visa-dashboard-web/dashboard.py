@@ -30,24 +30,30 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-# cache-bust: 2025-07-22T14:48:01.147779
+# cache-bust: 2025-07-22T15:46:50.476873
     import os
     BASE_DIR = os.path.dirname(__file__)
     db_path = os.path.join(BASE_DIR, "decisions.db")
     conn = sqlite3.connect(db_path)
 
-    df = pd.read_sql_query("SELECT app_number, decision, week FROM decisions", conn)
+    df = pd.read_sql_query("SELECT app_number, decision, week, end_date FROM decisions", conn)
     conn.close()
     df = df.rename(columns={"app_number": "application_number"})
+    # Convert end_date to datetime
+    df["end_date"] = pd.to_datetime(df["end_date"])
+    df = df.sort_values(by="end_date")  # 👈 sort by end_date in ascending order
     return df
 
 def parse_week_start(week_label):
-    match = re.match(r"(\d{1,2}-[A-Za-z]+)-to-", week_label)
+    match = re.match(r"(\d{1,2} [A-Za-z]+) to (\d{1,2} [A-Za-z]+ \d{4})", week_label)
     if not match:
         return None
-    start_str = match.group(1) + "-" + week_label[-4:]
+    start_str, end_str = match.groups()
     try:
-        return datetime.strptime(start_str, "%d-%B-%Y")
+        # Extract the year from the end date and apply it to the start
+        end_date = datetime.strptime(end_str, "%d %b %Y")
+        start_date = datetime.strptime(start_str + f" {end_date.year}", "%d %b %Y")
+        return start_date
     except Exception:
         return None
 
