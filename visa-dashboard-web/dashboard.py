@@ -234,7 +234,10 @@ else:
 
         # --- Charts and Table ---
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(summary_for_table.drop(columns=["week_start_date"]))
+            st.dataframe(
+                summary_for_table.drop(columns=["week_start_date"]),
+                height=200
+            )    
 
         show_chart(summary)
 
