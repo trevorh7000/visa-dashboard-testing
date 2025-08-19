@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import pandas as pd
 import matplotlib.pyplot as plt
+
 import re
 from datetime import datetime
 import os
@@ -71,6 +73,10 @@ def compute_stats(df):
     summary = summary.sort_values("week_start_date").reset_index(drop=True)
     return summary
 
+import streamlit as st
+import matplotlib.pyplot as plt
+import pandas as pd
+
 def show_chart(summary):
     weeks = summary["week"]
     approved = summary.get("Approved", pd.Series([0]*len(weeks)))
@@ -79,26 +85,51 @@ def show_chart(summary):
     refused_pct = summary["Refused %"]
     approved_pct = 100 - refused_pct
 
+    window = 8  # number of bars visible
+
+    # initialize start index in session state
+    if 'start_idx' not in st.session_state:
+        st.session_state.start_idx = max(0, len(weeks) - window)
+
+    # Create two Streamlit buttons in a single row (columns) and style them
+    col1, col2, col3 = st.columns([1,2,1])  # middle column centers them
+    with col2:
+        left_col, right_col = st.columns([1,1])
+        with left_col:
+            back_clicked = st.button("<< Back")
+        with right_col:
+            forward_clicked = st.button("Forward >>")
+
+    # Handle clicks
+    if back_clicked:
+        st.session_state.start_idx = max(0, st.session_state.start_idx - window)
+    if forward_clicked:
+        st.session_state.start_idx = min(len(weeks) - window, st.session_state.start_idx + window)
+
+    start = st.session_state.start_idx
+    end = start + window
+
+    # --- Matplotlib plotting ---
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    bar1 = ax.bar(weeks, approved, label="Approved", color="green")
-    bar2 = ax.bar(weeks, refused, label="Refused", color="red", bottom=approved)
+    bar1 = ax.bar(weeks[start:end], approved[start:end], label="Approved", color="green")
+    bar2 = ax.bar(weeks[start:end], refused[start:end], label="Refused", color="red", bottom=approved[start:end])
 
-    for rect, pct in zip(bar1, approved_pct):
+    for rect, pct in zip(bar1, approved_pct[start:end]):
         height = rect.get_height()
         if height > 0:
             ax.annotate(f'{int(height)} ({pct:.1f}%)',
                         xy=(rect.get_x() + rect.get_width() / 2, height / 2),
                         ha='center', va='center', color='white', fontsize=8, fontweight='bold')
 
-    for rect, base_height, pct in zip(bar2, approved, refused_pct):
+    for rect, base_height, pct in zip(bar2, approved[start:end], refused_pct[start:end]):
         height = rect.get_height()
         if height > 0:
             ax.annotate(f'{int(height)} ({pct:.1f}%)',
                         xy=(rect.get_x() + rect.get_width() / 2, base_height + height / 2),
                         ha='center', va='center', color='white', fontsize=8, fontweight='bold')
 
-    for i, tot in enumerate(total):
+    for i, tot in enumerate(total[start:end]):
         ax.annotate(f'Total: {int(tot)}',
                     xy=(i, tot),
                     xytext=(0, 3),
@@ -113,6 +144,33 @@ def show_chart(summary):
     ax.legend()
     fig.tight_layout()
     st.pyplot(fig)
+
+    # CSS to style Streamlit buttons so they look like solid buttons
+    st.markdown(
+        """
+        <style>
+        div.stButton > button {
+            background-color: #4CAF50 !important;
+            color: white !important;
+            font-weight: bold;
+            height: 40px;
+            width: 140px;
+            border-radius: 5px;
+            border: none;
+            margin: 0px;
+        }
+        div.stButton > button:hover {
+            background-color: #45a049 !important;
+            color: white !important;
+        }
+        div.stButton > button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # === MAIN APP ===
 
