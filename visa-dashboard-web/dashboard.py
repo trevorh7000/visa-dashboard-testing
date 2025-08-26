@@ -1,58 +1,64 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import pandas as pd
 import matplotlib.pyplot as plt
-
 import re
 from datetime import datetime
 import os
-
 import streamlit.components.v1 as components
 
-# --- Read message.txt ---
-message_path = "message.txt"
+# --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
+DB_PATH = os.path.join(BASE_DIR, "decisions.db")
 MSG_PATH = os.path.join(BASE_DIR, "message.txt")
-
-
-DB_PATH = "decisions.db"
+DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.py")
 
 st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
 
 st.markdown("""
     <style>
     input {
-        background-color: #dcdee0!important;  /* soft but visible orange */
+        background-color: #dcdee0!important;
         color: black !important;
         border: 2px solid black !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
+# --- Load data with cache busted by file mtimes ---
 @st.cache_data
-def load_data():
-# cache-bust: massive manual cahcebuster here!!!!
-    import os
-    BASE_DIR = os.path.dirname(__file__)
-    db_path = os.path.join(BASE_DIR, "decisions.db")
+def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
     conn = sqlite3.connect(db_path)
-
     df = pd.read_sql_query("SELECT app_number, decision, week, end_date FROM decisions", conn)
     conn.close()
     df = df.rename(columns={"app_number": "application_number"})
-    # Convert end_date to datetime
     df["end_date"] = pd.to_datetime(df["end_date"])
-    df = df.sort_values(by="end_date")  # 👈 sort by end_date in ascending order
-    return df
+    df = df.sort_values(by="end_date")
 
+    with open(msg_path, "r") as f:
+        msg = f.read().strip()
+
+    return df, msg
+
+# --- Compute modification times for cache busting ---
+db_mtime = os.path.getmtime(DB_PATH)
+msg_mtime = os.path.getmtime(MSG_PATH)
+dash_mtime = os.path.getmtime(DASHBOARD_PATH)
+
+df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
+
+# --- Last updated display ---
+last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
+last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
+st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
+
+# --- Helper functions ---
 def parse_week_start(week_label):
     match = re.match(r"(\d{1,2} [A-Za-z]+) to (\d{1,2} [A-Za-z]+ \d{4})", week_label)
     if not match:
         return None
     start_str, end_str = match.groups()
     try:
-        # Extract the year from the end date and apply it to the start
         end_date = datetime.strptime(end_str, "%d %b %Y")
         start_date = datetime.strptime(start_str + f" {end_date.year}", "%d %b %Y")
         return start_date
@@ -73,10 +79,6 @@ def compute_stats(df):
     summary = summary.sort_values("week_start_date").reset_index(drop=True)
     return summary
 
-import streamlit as st
-import matplotlib.pyplot as plt
-import pandas as pd
-
 def show_chart(summary):
     weeks = summary["week"]
     approved = summary.get("Approved", pd.Series([0]*len(weeks)))
@@ -84,15 +86,12 @@ def show_chart(summary):
     total = summary["Total"]
     refused_pct = summary["Refused %"]
     approved_pct = 100 - refused_pct
+    window = 8
 
-    window = 8  # number of bars visible
-
-    # initialize start index in session state
     if 'start_idx' not in st.session_state:
         st.session_state.start_idx = max(0, len(weeks) - window)
 
-    # Create two Streamlit buttons in a single row (columns) and style them
-    col1, col2, col3 = st.columns([1,2,1])  # middle column centers them
+    col1, col2, col3 = st.columns([1,2,1])
     with col2:
         left_col, right_col = st.columns([1,1])
         with left_col:
@@ -100,7 +99,6 @@ def show_chart(summary):
         with right_col:
             forward_clicked = st.button("Forward >>")
 
-    # Handle clicks
     if back_clicked:
         st.session_state.start_idx = max(0, st.session_state.start_idx - window)
     if forward_clicked:
@@ -109,9 +107,7 @@ def show_chart(summary):
     start = st.session_state.start_idx
     end = start + window
 
-    # --- Matplotlib plotting ---
     fig, ax = plt.subplots(figsize=(12, 6))
-
     bar1 = ax.bar(weeks[start:end], approved[start:end], label="Approved", color="green")
     bar2 = ax.bar(weeks[start:end], refused[start:end], label="Refused", color="red", bottom=approved[start:end])
 
@@ -145,9 +141,7 @@ def show_chart(summary):
     fig.tight_layout()
     st.pyplot(fig)
 
-    # CSS to style Streamlit buttons so they look like solid buttons
-    st.markdown(
-        """
+    st.markdown("""
         <style>
         div.stButton > button {
             background-color: #4CAF50 !important;
@@ -161,63 +155,32 @@ def show_chart(summary):
         }
         div.stButton > button:hover {
             background-color: #45a049 !important;
-            color: white !important;
         }
         div.stButton > button:focus {
             outline: none !important;
             box-shadow: none !important;
         }
         </style>
-        """,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
 # === MAIN APP ===
-
 st.title("📊 Visa Decisions Dashboard")
 
-# # add the logo and text
-logo_path = os.path.join(os.path.dirname(__file__), "BISA-Logo-250.png")
-
-# image from github so it ca be centred
-
-
-st.markdown("""
-    <style>
-        .centered {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            text-align: center;
-        }
-    </style>
-    <div class="centered">
-        <img src='https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
-    </div>
-""", unsafe_allow_html=True)
+logo_url = 'https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
+st.markdown(f'<div style="text-align:center;"><img src="{logo_url}" class="centered"></div>', unsafe_allow_html=True)
 
 # Centered text with hyperlink
-left_co, cent_co,last_co = st.columns(3)
+_, cent_co, _ = st.columns(3)
 with cent_co:
-    st.markdown(
-    """
+    st.markdown("""
     <div style="text-align: center; margin-top: 10px;">
         Compiled by <a href="https://businessirelandsouthafrica.co.za/" target="_blank">Business Ireland South Africa</a>
     </div>
-    """,
-    unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
-
-
-
-# ----------------------------------- new try  ----------------------------------
-df = load_data()
 if df.empty:
     st.warning("No data found in database.")
 else:
-
-    # --- Lookup moved to top ---
     st.subheader("🔎 Look Up Application Number")
     app_num = st.text_input("Enter Application Number (case insensitive):")
     if app_num:
@@ -228,21 +191,15 @@ else:
         else:
             st.error("No matching application number found.")
     else:
-        # --- Show summary and charts only if no lookup query ---
         summary = compute_stats(df)
         summary_for_table = summary.sort_values("week_start_date", ascending=False).reset_index(drop=True)
 
-        # --- Charts and Table ---
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(
-                summary_for_table.drop(columns=["week_start_date"]),
-                height=200
-            )    
+            st.dataframe(summary_for_table.drop(columns=["week_start_date"]), height=200)
 
         show_chart(summary)
 
-        # --- Downloads ---
-        st.subheader("📥 Download Data")
+        # Downloads
         csv_summary = summary.drop(columns=["week_start_date"]).to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
 
@@ -252,11 +209,8 @@ else:
 st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
 st.write("Dash board created by T Cubed - tghughes@gmail.com")
 
-if os.path.exists(MSG_PATH):
-    with open(MSG_PATH, "r") as f:
-        message = f.read().strip()  # strip removes leading/trailing blank lines
-
-    # --- Display with smaller boxed style ---
+# Message box
+if message:
     st.markdown("Status Message")
     st.markdown(f"""
     <div style="
