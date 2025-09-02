@@ -1,1 +1,5 @@
-Status: Up To Date.
+Extracted 298 rows from SAVD-Decisions-12-August-to-18-August.pdf - Inserted 0 new records.
+Extracted 274 rows from SAVD-Decisions-26-August-to-01-September.pdf - Inserted 274 new records.
+Extracted 322 rows from SAVD-Decisions-19-August-to-25-August.pdf - Inserted 0 new records.
+Extracted 352 rows from SAVD-Decisions-05-August-to-11-August.pdf - Inserted 0 new records.
+Total new records inserted: 274
