@@ -1,5 +1,5 @@
-Extracted 724 rows from SAVD-Decisions-16-September-to-22-September.pdf - Inserted 0 new records.
+Extracted 425 rows from SAVD-Decisions-14-October-to-20-October.pdf - Inserted 425 new records.
 Extracted 421 rows from SAVD-Decisions-30-September-to-06-October.pdf - Inserted 0 new records.
 Extracted 707 rows from SAVD-Decisions-23-September-to-29-September.pdf - Inserted 0 new records.
-Extracted 369 rows from SAVD-Decisions-07-October-to-13-October.pdf - Inserted 369 new records.
-Total new records inserted: 369
+Extracted 369 rows from SAVD-Decisions-07-October-to-13-October.pdf - Inserted 0 new records.
+Total new records inserted: 425
