@@ -64,7 +64,9 @@ def run_scraper():
         print("Fetching PDF links...")
         pdf_links = fetch_pdf_links(BASE_URL)
         print(f"Found {len(pdf_links)} total PDF(s).")
+        print(f"Found:\n{'\n'.join(pdf_links)}")
         logger.info(f"Found {len(pdf_links)} total PDF(s).")
+        logger.info (f"PDF Links: {pdf_links}")
 
         for link in pdf_links:
             try:
