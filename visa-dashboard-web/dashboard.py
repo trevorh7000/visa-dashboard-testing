@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 import os
 import streamlit.components.v1 as components
+import io
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
@@ -40,17 +41,6 @@ def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
 
     return df, msg
 
-# --- Compute modification times for cache busting ---
-db_mtime = os.path.getmtime(DB_PATH)
-msg_mtime = os.path.getmtime(MSG_PATH)
-dash_mtime = os.path.getmtime(DASHBOARD_PATH)
-
-df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
-
-# --- Last updated display ---
-last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
-last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
-st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
 
 # --- Helper functions ---
 def parse_week_start(week_label):
@@ -79,21 +69,20 @@ def compute_stats(df):
     summary = summary.sort_values("week_start_date").reset_index(drop=True)
     return summary
 
-def show_chart(summary):
+def show_chart(summary, window=8):
     weeks = summary["week"]
-    approved = summary.get("Approved", pd.Series([0]*len(weeks)))
-    refused = summary.get("Refused", pd.Series([0]*len(weeks)))
+    approved = summary.get("Approved", pd.Series([0] * len(weeks)))
+    refused = summary.get("Refused", pd.Series([0] * len(weeks)))
     total = summary["Total"]
     refused_pct = summary["Refused %"]
     approved_pct = 100 - refused_pct
-    window = 8
 
-    if 'start_idx' not in st.session_state:
+    if "start_idx" not in st.session_state:
         st.session_state.start_idx = max(0, len(weeks) - window)
 
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        left_col, right_col = st.columns([1,1])
+        left_col, right_col = st.columns([1, 1])
         with left_col:
             back_clicked = st.button("<< Back")
         with right_col:
@@ -107,40 +96,49 @@ def show_chart(summary):
     start = st.session_state.start_idx
     end = start + window
 
+    # Create the figure
     fig, ax = plt.subplots(figsize=(12, 6))
     bar1 = ax.bar(weeks[start:end], approved[start:end], label="Approved", color="green")
-    bar2 = ax.bar(weeks[start:end], refused[start:end], label="Refused", color="red", bottom=approved[start:end])
+    bar2 = ax.bar(
+        weeks[start:end], refused[start:end],
+        label="Refused", color="red", bottom=approved[start:end]
+    )
 
+    # Add annotations
     for rect, pct in zip(bar1, approved_pct[start:end]):
         height = rect.get_height()
         if height > 0:
-            ax.annotate(f'{int(height)} ({pct:.1f}%)',
+            ax.annotate(f"{int(height)} ({pct:.1f}%)",
                         xy=(rect.get_x() + rect.get_width() / 2, height / 2),
-                        ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+                        ha="center", va="center", color="white", fontsize=8, fontweight="bold")
 
     for rect, base_height, pct in zip(bar2, approved[start:end], refused_pct[start:end]):
         height = rect.get_height()
         if height > 0:
-            ax.annotate(f'{int(height)} ({pct:.1f}%)',
+            ax.annotate(f"{int(height)} ({pct:.1f}%)",
                         xy=(rect.get_x() + rect.get_width() / 2, base_height + height / 2),
-                        ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+                        ha="center", va="center", color="white", fontsize=8, fontweight="bold")
 
     for i, tot in enumerate(total[start:end]):
-        ax.annotate(f'Total: {int(tot)}',
+        ax.annotate(f"Total: {int(tot)}",
                     xy=(i, tot),
                     xytext=(0, 3),
                     textcoords="offset points",
-                    ha='center', va='bottom',
-                    fontsize=9, fontweight='bold')
+                    ha="center", va="bottom",
+                    fontsize=9, fontweight="bold")
 
     ax.set_title("Visa Decisions per Week")
     ax.set_ylabel("Number of Applications")
-    ax.tick_params(axis='x', rotation=45)
-    ax.grid(True, axis='y')
+    ax.tick_params(axis="x", rotation=45)
+    ax.grid(True, axis="y")
     ax.legend()
     fig.tight_layout()
+
+    # Show in Streamlit
     st.pyplot(fig)
 
+   
+    # Optional: keep your button styling
     st.markdown("""
         <style>
         div.stButton > button {
@@ -163,7 +161,25 @@ def show_chart(summary):
         </style>
     """, unsafe_allow_html=True)
 
+    return fig
+
 # === MAIN APP ===
+
+# --- Compute modification times for cache busting ---
+db_mtime = os.path.getmtime(DB_PATH)
+msg_mtime = os.path.getmtime(MSG_PATH)
+dash_mtime = os.path.getmtime(DASHBOARD_PATH)
+
+# --- Load data and compute summary---
+df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
+summary = compute_stats(df)
+
+
+# --- Last updated display ---
+last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
+last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
+st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
+
 st.title("📊 Visa Decisions Dashboard")
 
 logo_url = 'https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
@@ -191,15 +207,24 @@ else:
         else:
             st.error("No matching application number found.")
     else:
-        summary = compute_stats(df)
         summary_for_table = summary.sort_values("week_start_date", ascending=False).reset_index(drop=True)
 
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
             st.dataframe(summary_for_table.drop(columns=["week_start_date"]), height=200)
 
-        show_chart(summary)
+        fig = show_chart(summary)
 
         # Downloads
+
+        # Chart download (in the same container as above)
+
+        # Chart download
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=200)
+        buf.seek(0)
+        st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
+
+        # CSV downloads
         csv_summary = summary.drop(columns=["week_start_date"]).to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
 
