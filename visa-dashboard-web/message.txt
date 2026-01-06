@@ -1,5 +1,5 @@
+Extracted 23 rows from SAVD-Decisions-30-December-to-05-January.pdf - Inserted 23 new records.
 Extracted 43 rows from SAVD-Decisions-16-December-to-22-December.pdf - Inserted 0 new records.
-Extracted 175 rows from SAVD-Decisions-02-December-to-08-December.pdf - Inserted 0 new records.
-Extracted 17 rows from SAVD-Decisions-23-December-to-29-December.pdf - Inserted 17 new records.
+Extracted 17 rows from SAVD-Decisions-23-December-to-29-December.pdf - Inserted 0 new records.
 Extracted 59 rows from SAVD-Decisions-09-December-to-15-December.pdf - Inserted 0 new records.
-Total new records inserted: 17
+Total new records inserted: 23
