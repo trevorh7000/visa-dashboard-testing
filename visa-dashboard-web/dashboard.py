@@ -6,7 +6,6 @@ import os
 import io
 from datetime import datetime
 
-
 # --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(BASE_DIR, "decisions.db")
@@ -29,64 +28,66 @@ st.markdown("""
 @st.cache_data
 def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
     conn = sqlite3.connect(db_path)
-
-    # --- CHANGE: include start_date column when reading DB ---
-    df = pd.read_sql_query(
-        "SELECT app_number, decision, week, start_date, end_date FROM decisions",
-        conn
-    )
+    # --- Make sure to read start_date and end_date from database ---
+    df = pd.read_sql_query("SELECT app_number, decision, week, start_date, end_date FROM decisions", conn)
     conn.close()
-
     df = df.rename(columns={"app_number": "application_number"})
-
-    # --- CHANGE: convert start_date and end_date to proper datetime objects ---
+    # --- Convert both start_date and end_date to datetime objects ---
     df["start_date"] = pd.to_datetime(df["start_date"])
     df["end_date"] = pd.to_datetime(df["end_date"])
-
-    # --- CHANGE: sort by end_date by default ---
     df = df.sort_values(by="end_date")
-
-    # Load message file
+    
     with open(msg_path, "r") as f:
         msg = f.read().strip()
-
+    
     return df, msg
 
-
-# --- Compute stats ---
+# --- Helper functions ---
 def compute_stats(df):
+    """
+    Compute weekly summary stats: Approved, Refused, Total, Refused %
+    Grouping and sorting by end_date (chronological order)
+    """
     df["decision"] = df["decision"].str.strip().str.capitalize()
-
-    # --- CHANGE: group by end_date instead of parsing week strings ---
+    
+    # --- Group by end_date instead of week string to fix ordering issues ---
     summary = (
         df.groupby("end_date")["decision"]
         .value_counts()
         .unstack(fill_value=0)
         .reset_index()
     )
-
-    # Add totals and percentages
+    
     summary["Total"] = summary.get("Approved", 0) + summary.get("Refused", 0)
     summary["Refused %"] = (summary.get("Refused", 0) / summary["Total"] * 100).round(2)
 
-    # --- CHANGE: keep the week text label for x-axis display ---
-    # Use the first week label corresponding to this end_date
+    # --- Bring week label back for display but keep ordering by end_date ---
     week_labels = df[["end_date", "week"]].drop_duplicates()
     summary = summary.merge(week_labels, on="end_date", how="left")
 
-    # --- CHANGE: reorder columns so 'week' comes first ---
+    # --- Reorder columns so 'week' appears first ---
     cols = ["week", "end_date", "Approved", "Refused", "Total", "Refused %"]
     summary = summary[cols]
 
-    # --- sort by end_date (chronological order) ---
+    # --- Sort by end_date ---
     summary = summary.sort_values("end_date").reset_index(drop=True)
 
     return summary
 
+# --- Advanced stats function ---
+def advanced_stats(summary):
+    """
+    Compute advanced stats for visa decisions:
+    - 3-week moving average of total applications
+    - Week-over-week percentage change in total applications
+    """
+    adv = summary.copy()
+    adv["Total_3wk_MA"] = adv["Total"].rolling(window=3, min_periods=1).mean().round(2)
+    adv["Total_pct_change"] = adv["Total"].pct_change().multiply(100).round(2)
+    return adv
 
-# --- Show chart ---
 def show_chart(summary, window=8):
-    weeks = summary["week"]  # --- Display label on x-axis ---
+    weeks = summary["week"]
     approved = summary.get("Approved", pd.Series([0] * len(weeks)))
     refused = summary.get("Refused", pd.Series([0] * len(weeks)))
     total = summary["Total"]
@@ -178,7 +179,6 @@ def show_chart(summary, window=8):
 
     return fig
 
-
 # === MAIN APP ===
 
 # --- Compute modification times for cache busting ---
@@ -186,9 +186,12 @@ db_mtime = os.path.getmtime(DB_PATH)
 msg_mtime = os.path.getmtime(MSG_PATH)
 dash_mtime = os.path.getmtime(DASHBOARD_PATH)
 
-# --- Load data and compute summary ---
+# --- Load data and compute summary---
 df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
 summary = compute_stats(df)
+
+# --- Compute advanced stats ---
+adv_summary = advanced_stats(summary)
 
 # --- Last updated display ---
 last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
@@ -222,12 +225,16 @@ else:
         else:
             st.error("No matching application number found.")
     else:
-        # --- CHANGE: sort by end_date for table display ---
-        summary_for_table = summary.sort_values("end_date", ascending=False).reset_index(drop=True)
-
+        # --- Display summary table ---
+        summary_for_table = summary.reset_index(drop=True)
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(summary_for_table.drop(columns=["end_date"]), height=200)
+            st.dataframe(summary_for_table, height=200)
 
+        # --- Display advanced stats above the chart ---
+        st.subheader("📈 Advanced Stats")
+        st.dataframe(adv_summary[["week", "Total", "Total_3wk_MA", "Total_pct_change"]], height=150)
+
+        # --- Show chart ---
         fig = show_chart(summary)
 
         # --- Downloads ---
@@ -236,15 +243,14 @@ else:
         buf.seek(0)
         st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
 
-        # CSV downloads
-        csv_summary = summary.drop(columns=["end_date"]).to_csv(index=False).encode("utf-8")
+        csv_summary = summary.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
 
         csv_full = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
 
 st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
-st.write("Dash board created by T Cubed - tghughes@gmail.com")
+st.write("Dashboard created by T Cubed - tghughes@gmail.com")
 
 # Message box
 if message:
