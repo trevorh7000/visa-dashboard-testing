@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
-import re
-from datetime import datetime
 import os
-import streamlit.components.v1 as components
 import io
+from datetime import datetime
+
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
@@ -30,47 +29,64 @@ st.markdown("""
 @st.cache_data
 def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
     conn = sqlite3.connect(db_path)
-    df = pd.read_sql_query("SELECT app_number, decision, week, end_date FROM decisions", conn)
+
+    # --- CHANGE: include start_date column when reading DB ---
+    df = pd.read_sql_query(
+        "SELECT app_number, decision, week, start_date, end_date FROM decisions",
+        conn
+    )
     conn.close()
+
     df = df.rename(columns={"app_number": "application_number"})
+
+    # --- CHANGE: convert start_date and end_date to proper datetime objects ---
+    df["start_date"] = pd.to_datetime(df["start_date"])
     df["end_date"] = pd.to_datetime(df["end_date"])
+
+    # --- CHANGE: sort by end_date by default ---
     df = df.sort_values(by="end_date")
 
+    # Load message file
     with open(msg_path, "r") as f:
         msg = f.read().strip()
 
     return df, msg
 
 
-# --- Helper functions ---
-def parse_week_start(week_label):
-    match = re.match(r"(\d{1,2} [A-Za-z]+) to (\d{1,2} [A-Za-z]+ \d{4})", week_label)
-    if not match:
-        return None
-    start_str, end_str = match.groups()
-    try:
-        end_date = datetime.strptime(end_str, "%d %b %Y")
-        start_date = datetime.strptime(start_str + f" {end_date.year}", "%d %b %Y")
-        return start_date
-    except Exception:
-        return None
-
+# --- Compute stats ---
 def compute_stats(df):
     df["decision"] = df["decision"].str.strip().str.capitalize()
+
+    # --- CHANGE: group by end_date instead of parsing week strings ---
     summary = (
-        df.groupby("week")["decision"]
+        df.groupby("end_date")["decision"]
         .value_counts()
         .unstack(fill_value=0)
         .reset_index()
     )
+
+    # Add totals and percentages
     summary["Total"] = summary.get("Approved", 0) + summary.get("Refused", 0)
     summary["Refused %"] = (summary.get("Refused", 0) / summary["Total"] * 100).round(2)
-    summary["week_start_date"] = summary["week"].apply(parse_week_start)
-    summary = summary.sort_values("week_start_date").reset_index(drop=True)
+
+    # --- CHANGE: keep the week text label for x-axis display ---
+    # Use the first week label corresponding to this end_date
+    week_labels = df[["end_date", "week"]].drop_duplicates()
+    summary = summary.merge(week_labels, on="end_date", how="left")
+
+    # --- CHANGE: reorder columns so 'week' comes first ---
+    cols = ["week", "end_date", "Approved", "Refused", "Total", "Refused %"]
+    summary = summary[cols]
+
+    # --- sort by end_date (chronological order) ---
+    summary = summary.sort_values("end_date").reset_index(drop=True)
+
     return summary
 
+
+# --- Show chart ---
 def show_chart(summary, window=8):
-    weeks = summary["week"]
+    weeks = summary["week"]  # --- Display label on x-axis ---
     approved = summary.get("Approved", pd.Series([0] * len(weeks)))
     refused = summary.get("Refused", pd.Series([0] * len(weeks)))
     total = summary["Total"]
@@ -137,7 +153,6 @@ def show_chart(summary, window=8):
     # Show in Streamlit
     st.pyplot(fig)
 
-   
     # Optional: keep your button styling
     st.markdown("""
         <style>
@@ -163,6 +178,7 @@ def show_chart(summary, window=8):
 
     return fig
 
+
 # === MAIN APP ===
 
 # --- Compute modification times for cache busting ---
@@ -170,10 +186,9 @@ db_mtime = os.path.getmtime(DB_PATH)
 msg_mtime = os.path.getmtime(MSG_PATH)
 dash_mtime = os.path.getmtime(DASHBOARD_PATH)
 
-# --- Load data and compute summary---
+# --- Load data and compute summary ---
 df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
 summary = compute_stats(df)
-
 
 # --- Last updated display ---
 last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
@@ -207,25 +222,22 @@ else:
         else:
             st.error("No matching application number found.")
     else:
-        summary_for_table = summary.sort_values("week_start_date", ascending=False).reset_index(drop=True)
+        # --- CHANGE: sort by end_date for table display ---
+        summary_for_table = summary.sort_values("end_date", ascending=False).reset_index(drop=True)
 
         with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(summary_for_table.drop(columns=["week_start_date"]), height=200)
+            st.dataframe(summary_for_table.drop(columns=["end_date"]), height=200)
 
         fig = show_chart(summary)
 
-        # Downloads
-
-        # Chart download (in the same container as above)
-
-        # Chart download
+        # --- Downloads ---
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=200)
         buf.seek(0)
         st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
 
         # CSV downloads
-        csv_summary = summary.drop(columns=["week_start_date"]).to_csv(index=False).encode("utf-8")
+        csv_summary = summary.drop(columns=["end_date"]).to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
 
         csv_full = df.to_csv(index=False).encode("utf-8")
