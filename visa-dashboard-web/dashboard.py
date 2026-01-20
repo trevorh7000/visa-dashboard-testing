@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
+import re
+from datetime import datetime  # CHANGED / NEW: ensure datetime imported
 import os
+import streamlit.components.v1 as components
 import io
-from datetime import datetime
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
@@ -28,71 +30,61 @@ st.markdown("""
 @st.cache_data
 def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
     conn = sqlite3.connect(db_path)
-    # --- Make sure to read start_date and end_date from database ---
-    df = pd.read_sql_query("SELECT app_number, decision, week, start_date, end_date FROM decisions", conn)
+    df = pd.read_sql_query("SELECT app_number, decision, week, start_date, end_date FROM decisions", conn)  # CHANGED / NEW: include start_date
     conn.close()
     df = df.rename(columns={"app_number": "application_number"})
-    # --- Convert both start_date and end_date to datetime objects ---
-    df["start_date"] = pd.to_datetime(df["start_date"])
     df["end_date"] = pd.to_datetime(df["end_date"])
-    df = df.sort_values(by="end_date")
-    
+    df["start_date"] = pd.to_datetime(df["start_date"])  # CHANGED / NEW: convert start_date to datetime
+    df = df.sort_values(by="end_date")  # end_date is used for ordering
+
     with open(msg_path, "r") as f:
         msg = f.read().strip()
-    
+
     return df, msg
+
 
 # --- Helper functions ---
 def compute_stats(df):
-    """
-    Compute weekly summary stats: Approved, Refused, Total, Refused %
-    Grouping and sorting by end_date (chronological order)
-    """
     df["decision"] = df["decision"].str.strip().str.capitalize()
-    
-    # --- Group by end_date instead of week string to fix ordering issues ---
     summary = (
-        df.groupby("end_date")["decision"]
+        df.groupby("week")["decision"]
         .value_counts()
         .unstack(fill_value=0)
         .reset_index()
     )
-    
     summary["Total"] = summary.get("Approved", 0) + summary.get("Refused", 0)
     summary["Refused %"] = (summary.get("Refused", 0) / summary["Total"] * 100).round(2)
-
-    # --- Bring week label back for display but keep ordering by end_date ---
-    week_labels = df[["end_date", "week"]].drop_duplicates()
-    summary = summary.merge(week_labels, on="end_date", how="left")
-
-    # --- Reorder columns so 'week' appears first ---
-    cols = ["week", "end_date", "Approved", "Refused", "Total", "Refused %"]
-    summary = summary[cols]
-
-    # --- Sort by end_date ---
-    summary = summary.sort_values("end_date").reset_index(drop=True)
-
+    summary["end_date"] = df.groupby("week")["end_date"].first().values  # CHANGED / NEW: get end_date for each week
+    summary["start_date"] = df.groupby("week")["start_date"].first().values  # CHANGED / NEW: include start_date if needed
+    summary = summary.sort_values("end_date").reset_index(drop=True)  # CHANGED / NEW: sort by end_date
     return summary
 
-# --- Advanced stats function ---
+
+# --- Advanced stats ---
 def advanced_stats(summary):
-    """
-    Compute advanced stats for visa decisions:
-    - 3-week moving average of total applications
-    - Week-over-week percentage change in total applications
-    """
     adv = summary.copy()
-    adv["Total_3wk_MA"] = adv["Total"].rolling(window=3, min_periods=1).mean().round(2)
-    adv["Total_pct_change"] = adv["Total"].pct_change().multiply(100).round(2)
+    adv["Total_3wk_MA"] = adv["Total"].rolling(3, min_periods=1).mean()  # CHANGED / NEW: 3-week moving average
+    adv["Total_pct_change"] = adv["Total"].pct_change().fillna(0) * 100  # CHANGED / NEW: week-to-week % change
     return adv
 
+
+# --- Chart function ---
 def show_chart(summary, window=8):
     weeks = summary["week"]
     approved = summary.get("Approved", pd.Series([0] * len(weeks)))
     refused = summary.get("Refused", pd.Series([0] * len(weeks)))
     total = summary["Total"]
+
+    # --- NEW: week-to-week % change
+    total_pct_change = total.pct_change().fillna(0) * 100
+
     refused_pct = summary["Refused %"]
     approved_pct = 100 - refused_pct
+
+    # --- FIXED Y-AXIS SCALE (global max across all weeks) ---
+    global_max_total = summary["Total"].max()
+    y_max = int(global_max_total * 1.1)  # 10% headroom
+
 
     if "start_idx" not in st.session_state:
         st.session_state.start_idx = max(0, len(weeks) - window)
@@ -113,7 +105,7 @@ def show_chart(summary, window=8):
     start = st.session_state.start_idx
     end = start + window
 
-    # Create the figure
+    # --- Plot bars
     fig, ax = plt.subplots(figsize=(12, 6))
     bar1 = ax.bar(weeks[start:end], approved[start:end], label="Approved", color="green")
     bar2 = ax.bar(
@@ -121,7 +113,21 @@ def show_chart(summary, window=8):
         label="Refused", color="red", bottom=approved[start:end]
     )
 
-    # Add annotations
+    # --- Add annotations with combined total and percentage change ---
+    for i, (tot, pc_change) in enumerate(zip(total[start:end], total_pct_change[start:end])):
+        ax.annotate(
+            f"{int(tot)} ({pc_change:+.1f}%)",
+            xy=(i, tot),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
+            color="black"
+        )
+
+    # --- Add approved/refused inside bars ---
     for rect, pct in zip(bar1, approved_pct[start:end]):
         height = rect.get_height()
         if height > 0:
@@ -136,13 +142,9 @@ def show_chart(summary, window=8):
                         xy=(rect.get_x() + rect.get_width() / 2, base_height + height / 2),
                         ha="center", va="center", color="white", fontsize=8, fontweight="bold")
 
-    for i, tot in enumerate(total[start:end]):
-        ax.annotate(f"Total: {int(tot)}",
-                    xy=(i, tot),
-                    xytext=(0, 3),
-                    textcoords="offset points",
-                    ha="center", va="bottom",
-                    fontsize=9, fontweight="bold")
+
+    # --- APPLY FIXED Y SCALE ---
+    ax.set_ylim(0, y_max)
 
     ax.set_title("Visa Decisions per Week")
     ax.set_ylabel("Number of Applications")
@@ -151,10 +153,9 @@ def show_chart(summary, window=8):
     ax.legend()
     fig.tight_layout()
 
-    # Show in Streamlit
     st.pyplot(fig)
 
-    # Optional: keep your button styling
+    # Button styling
     st.markdown("""
         <style>
         div.stButton > button {
@@ -179,21 +180,19 @@ def show_chart(summary, window=8):
 
     return fig
 
+
+
 # === MAIN APP ===
 
-# --- Compute modification times for cache busting ---
 db_mtime = os.path.getmtime(DB_PATH)
 msg_mtime = os.path.getmtime(MSG_PATH)
 dash_mtime = os.path.getmtime(DASHBOARD_PATH)
 
-# --- Load data and compute summary---
 df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
 summary = compute_stats(df)
+adv_summary = advanced_stats(summary)  # CHANGED / NEW
 
-# --- Compute advanced stats ---
-adv_summary = advanced_stats(summary)
-
-# --- Last updated display ---
+# Last updated display
 last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
 last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
 st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
@@ -203,7 +202,6 @@ st.title("📊 Visa Decisions Dashboard")
 logo_url = 'https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
 st.markdown(f'<div style="text-align:center;"><img src="{logo_url}" class="centered"></div>', unsafe_allow_html=True)
 
-# Centered text with hyperlink
 _, cent_co, _ = st.columns(3)
 with cent_co:
     st.markdown("""
@@ -225,16 +223,20 @@ else:
         else:
             st.error("No matching application number found.")
     else:
-        # --- Display summary table ---
-        summary_for_table = summary.reset_index(drop=True)
-        with st.expander("📋 Show Weekly Summary Table", expanded=True):
-            st.dataframe(summary_for_table, height=200)
+        # --- Weekly summary table reversed & header fixed
+        summary_for_table = summary.iloc[::-1].reset_index(drop=True)
+        st.subheader("📋 Weekly Summary Table")
+        st.dataframe(summary_for_table, height=200)
 
-        # --- Display advanced stats above the chart ---
+        # --- Advanced stats table reversed & header fixed
+        adv_summary_for_table = adv_summary.iloc[::-1].reset_index(drop=True)
         st.subheader("📈 Advanced Stats")
-        st.dataframe(adv_summary[["week", "Total", "Total_3wk_MA", "Total_pct_change"]], height=150)
+        st.dataframe(
+            adv_summary_for_table[["week", "Total", "Total_3wk_MA", "Total_pct_change"]],
+            height=150
+        )
 
-        # --- Show chart ---
+        # --- Show chart with moving average & % change
         fig = show_chart(summary)
 
         # --- Downloads ---
@@ -243,14 +245,18 @@ else:
         buf.seek(0)
         st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
 
-        csv_summary = summary.to_csv(index=False).encode("utf-8")
+        # CSV with moving average and % change
+        summary_for_csv = summary.copy()
+        summary_for_csv["Total_3wk_MA"] = adv_summary["Total_3wk_MA"]
+        summary_for_csv["Total_pct_change"] = adv_summary["Total_pct_change"]
+        csv_summary = summary_for_csv.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
 
         csv_full = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
 
 st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
-st.write("Dashboard created by T Cubed - tghughes@gmail.com")
+st.write("Dash board created by T Cubed - tghughes@gmail.com")
 
 # Message box
 if message:
