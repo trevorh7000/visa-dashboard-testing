@@ -58,6 +58,12 @@ def init_db(db_path):
             UNIQUE(app_number, week)
         )
     """)
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+        setting TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+)
+''')
     conn.commit()
     return conn
 
