@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*- 
 """
-Scraper for South Africa Visa Desk PDF links.
+Downloaderfor South Africa Visa Desk PDF links and downloads.
 This script fetches PDF links from the South Africa Visa Desk page,
-and returns the list of links.
+downloads them, and saves them to a specified directory.
 """
 
 import requests
@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 # === wrapping: moved config and path logic into a setup function
 def setup():
     BASE_URL = "https://www.irishimmigration.ie/south-africa-visa-desk/#tourist"
-    return BASE_URL
+    BASE_DIR = os.path.dirname(__file__)
+    TO_PROCESS_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "data", "pdf", "to_process"))
+    return BASE_URL, TO_PROCESS_DIR
 # === end wrapping
 
 def fetch_pdf_links(base_url):
@@ -38,12 +40,26 @@ def fetch_pdf_links(base_url):
     ]
     return pdf_links
 
+def download_pdf(url, folder):
+    filename = os.path.basename(url)
+    filepath = os.path.join(folder, filename)
+
+    if os.path.exists(filepath):
+        print(f"Already downloaded: {filename}")
+        return
+
+    print(f"Downloading: {url}")
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    with open(filepath, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
 
 # === wrapping: main logic moved into run_scraper()
 def run_scraper():
     try:
-        BASE_URL = setup()
-        # os.makedirs(TO_PROCESS_DIR, exist_ok=True)
+        BASE_URL, TO_PROCESS_DIR = setup()
+        os.makedirs(TO_PROCESS_DIR, exist_ok=True)
 
         print("Fetching PDF links...")
         pdf_links = fetch_pdf_links(BASE_URL)
@@ -52,14 +68,14 @@ def run_scraper():
         logger.info(f"Found {len(pdf_links)} total PDF(s).")
         logger.info (f"PDF Links: {pdf_links}")
 
-        # for link in pdf_links:
-        #     try:
-        #         download_pdf(link, TO_PROCESS_DIR)
-        #     except Exception as e:
-        #         print(f"Error downloading {link}: {e}")
-        #         logger.error(f"Error downloading {link}: {e}")
+        for link in pdf_links:
+            try:
+                download_pdf(link, TO_PROCESS_DIR)
+            except Exception as e:
+                print(f"Error downloading {link}: {e}")
+                logger.error(f"Error downloading {link}: {e}")
 
-        return pdf_links
+        return True
     except Exception as e:
         print(f"❌ Scraper failed: {e}")
         logger.error(f"Scraper failed: {e}")

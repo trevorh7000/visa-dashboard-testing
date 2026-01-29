@@ -1,7 +1,7 @@
 import argparse
 import sqlite3
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import sys
 
 # ---- Database path (canonical) ----
@@ -33,7 +33,8 @@ def get_setting(key):
             (key,)
         ).fetchone()
 
-    print(row[0] if row else "(not set)")
+    # print(row[0] if row else "(not set)") # not needed now as ai return the values
+    return row[0] if row else None
 
 def set_setting(key, value):
     with connect() as conn:
@@ -68,6 +69,13 @@ def reset_settings():
 
     print("settings table cleared")
 
+def get_scraped_files():
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT filename, url, date_added FROM scraped_files ORDER BY date_added DESC"
+        ).fetchall()
+    return rows
+
 # ---- CLI ----
 
 def main():
@@ -93,7 +101,8 @@ def main():
         "--set",
         nargs=2,
         metavar=("KEY", "VALUE"),
-        help="Set a setting value (use 't' for current UTC time)"
+        help="Set a setting value (use 't' for current UTC time or 'to' for 24 hours ago" \
+        ")"
     )
 
     group.add_argument(
@@ -128,6 +137,8 @@ def main():
 
         if value.lower() == "t":
             value = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if value.lower() == "to":
+            value = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
 
         set_setting(key, value)
         print(f"{key} set to {value}")
@@ -144,3 +155,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# CREATE TABLE scraped_files (
+#     filename TEXT PRIMARY KEY,
+#     url TEXT,
+#     date_added TEXT
+# );

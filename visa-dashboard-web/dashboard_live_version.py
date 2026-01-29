@@ -15,6 +15,7 @@ MSG_PATH = os.path.join(BASE_DIR, "message.txt")
 DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.py")
 
 st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
+
 st.markdown("""
     <style>
     input {
@@ -152,7 +153,30 @@ def show_chart(summary, window=8):
     ax.legend()
     fig.tight_layout()
 
+    st.pyplot(fig)
 
+    # Button styling
+    st.markdown("""
+        <style>
+        div.stButton > button {
+            background-color: #4CAF50 !important;
+            color: white !important;
+            font-weight: bold;
+            height: 40px;
+            width: 140px;
+            border-radius: 5px;
+            border: none;
+            margin: 0px;
+        }
+        div.stButton > button:hover {
+            background-color: #45a049 !important;
+        }
+        div.stButton > button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     return fig
 
@@ -214,43 +238,6 @@ else:
 
         # --- Show chart with moving average & % change
         fig = show_chart(summary)
-            # now i removed the streamlit logic from show_chart I should rename it to generate_chart or similar
-        st.pyplot(fig)
-
-        # Button styling
-        st.markdown("""
-            <style>
-            div.stButton > button {
-                background-color: #4CAF50 !important;
-                color: white !important;
-                font-weight: bold;
-                height: 40px;
-                width: 140px;
-                border-radius: 5px;
-                border: none;
-                margin: 0px;
-            }
-            div.stButton > button:hover {
-                background-color: #45a049 !important;
-            }
-            div.stButton > button:focus {
-                outline: none !important;
-                box-shadow: none !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # above can be moved to a fucntion i think
-        ########################################
-        # put new debuggin st.writes here if needed
-        ########################################
-        # st.write(df)  # Example debug line
-        # st.write(summary)
-        # st.write(adv_summary)
-        # st.write("this is fig printed  ido not know what fig is:")
-        # st.write("fig object type:", type(fig))
-        # st.write(fig)
-        ########################################
 
         # --- Downloads ---
         buf = io.BytesIO()
