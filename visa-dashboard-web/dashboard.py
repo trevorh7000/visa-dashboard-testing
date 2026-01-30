@@ -1,11 +1,13 @@
-import streamlit as st
+# import streamlit as st
+# import streamlit.components.v1 as components
+from turtle import st
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
 import re
 from datetime import datetime  # CHANGED / NEW: ensure datetime imported
 import os
-import streamlit.components.v1 as components
+
 import io
 
 # --- Paths ---
@@ -14,19 +16,9 @@ DB_PATH = os.path.join(BASE_DIR, "decisions.db")
 MSG_PATH = os.path.join(BASE_DIR, "message.txt")
 DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.py")
 
-st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
-st.markdown("""
-    <style>
-    input {
-        background-color: #dcdee0!important;
-        color: black !important;
-        border: 2px solid black !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-# --- Load data with cache busted by file mtimes ---
-@st.cache_data
+
+# --- Load data ---
 def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
     conn = sqlite3.connect(db_path) # cache buster added Tuesday Jan 27 as i pull out my hair
     df = pd.read_sql_query("SELECT app_number, decision, week, start_date, end_date FROM decisions", conn)  # CHANGED / NEW: include start_date
@@ -158,135 +150,169 @@ def show_chart(summary, window=8):
 
 
 
+
 # === MAIN APP ===
+def main():
+    """Set up Streamlit page configuration and styles and all the output."""
+    
+    import streamlit as st
+    import streamlit.components.v1 as components
 
-db_mtime = os.path.getmtime(DB_PATH)
-msg_mtime = os.path.getmtime(MSG_PATH)
-dash_mtime = os.path.getmtime(DASHBOARD_PATH)
-
-df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
-summary = compute_stats(df)
-adv_summary = advanced_stats(summary)  # CHANGED / NEW
-
-# Last updated display
-last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
-last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
-st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
-
-st.title("📊 Visa Decisions Dashboard")
-
-logo_url = 'https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
-st.markdown(f'<div style="text-align:center;"><img src="{logo_url}" class="centered"></div>', unsafe_allow_html=True)
-
-_, cent_co, _ = st.columns(3)
-with cent_co:
+    st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
     st.markdown("""
-    <div style="text-align: center; margin-top: 10px;">
-        Compiled by <a href="https://businessirelandsouthafrica.co.za/" target="_blank">Business Ireland South Africa</a>
-    </div>
+        <style>
+        input {
+            background-color: #dcdee0!important;
+            color: black !important;
+            border: 2px solid black !important;
+        }
+        </style>
     """, unsafe_allow_html=True)
 
-if df.empty:
-    st.warning("No data found in database.")
-else:
-    st.subheader("🔎 Look Up Application Number")
-    app_num = st.text_input("Enter Application Number (case insensitive):")
-    if app_num:
-        results = df[df["application_number"].str.lower() == app_num.strip().lower()]
-        if not results.empty:
-            st.success(f"Found {len(results)} result(s):")
-            st.table(results)
-        else:
-            st.error("No matching application number found.")
-    else:
-        # --- Weekly summary table reversed & header fixed
-        summary_for_table = summary.iloc[::-1].reset_index(drop=True)
-        st.subheader("📋 Weekly Summary Table")
-        st.dataframe(summary_for_table, height=200)
+    db_mtime = os.path.getmtime(DB_PATH)
+    msg_mtime = os.path.getmtime(MSG_PATH)
+    dash_mtime = os.path.getmtime(DASHBOARD_PATH)
 
-        # --- Advanced stats table reversed & header fixed
-        adv_summary_for_table = adv_summary.iloc[::-1].reset_index(drop=True)
-        st.subheader("📈 Advanced Stats")
-        st.dataframe(
-            adv_summary_for_table[["week", "Total", "Total_3wk_MA", "Total_pct_change"]],
-            height=150
-        )
+    df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
+    summary = compute_stats(df)
+    adv_summary = advanced_stats(summary)  # CHANGED / NEW
 
-        # --- Show chart with moving average & % change
-        fig = show_chart(summary)
-            # now i removed the streamlit logic from show_chart I should rename it to generate_chart or similar
-        st.pyplot(fig)
+    # Last updated display
+    last_updated_ts = max(db_mtime, msg_mtime, dash_mtime)
+    last_updated = datetime.fromtimestamp(last_updated_ts).strftime("%Y-%m-%d %H:%M:%S")
+    st.markdown(f"<p style='text-align:right; font-size:80%; color:gray;'>Last updated: {last_updated}</p>", unsafe_allow_html=True)
 
-        # Button styling
+    st.title("📊 Visa Decisions Dashboard")
+
+    logo_url = 'https://raw.githubusercontent.com/trevorh7000/visa-dashboard/master/visa-dashboard-web/BISA-Logo-250.png'
+    st.markdown(f'<div style="text-align:center;"><img src="{logo_url}" class="centered"></div>', unsafe_allow_html=True)
+
+    _, cent_co, _ = st.columns(3)
+    with cent_co:
         st.markdown("""
-            <style>
-            div.stButton > button {
-                background-color: #4CAF50 !important;
-                color: white !important;
-                font-weight: bold;
-                height: 40px;
-                width: 140px;
-                border-radius: 5px;
-                border: none;
-                margin: 0px;
-            }
-            div.stButton > button:hover {
-                background-color: #45a049 !important;
-            }
-            div.stButton > button:focus {
-                outline: none !important;
-                box-shadow: none !important;
-            }
-            </style>
+        <div style="text-align: center; margin-top: 10px;">
+            Compiled by <a href="https://businessirelandsouthafrica.co.za/" target="_blank">Business Ireland South Africa</a>
+        </div>
         """, unsafe_allow_html=True)
 
-        # above can be moved to a fucntion i think
-        ########################################
-        # put new debuggin st.writes here if needed
-        ########################################
-        # st.write(df)  # Example debug line
-        # st.write(summary)
-        # st.write(adv_summary)
-        # st.write("this is fig printed  ido not know what fig is:")
-        # st.write("fig object type:", type(fig))
-        # st.write(fig)
-        ########################################
+    if df.empty:
+        st.warning("No data found in database.")
+    else:
+        st.subheader("🔎 Look Up Application Number")
+        app_num = st.text_input("Enter Application Number (case insensitive):")
+        if app_num:
+            results = df[df["application_number"].str.lower() == app_num.strip().lower()]
+            if not results.empty:
+                st.success(f"Found {len(results)} result(s):")
+                st.table(results)
+            else:
+                st.error("No matching application number found.")
+        else:
+            # --- Weekly summary table reversed & header fixed
+            summary_for_table = summary.iloc[::-1].reset_index(drop=True)
+            st.subheader("📋 Weekly Summary Table")
+            st.dataframe(summary_for_table, height=200)
 
-        # --- Downloads ---
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=200)
-        buf.seek(0)
-        st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
+            # --- Advanced stats table reversed & header fixed
+            adv_summary_for_table = adv_summary.iloc[::-1].reset_index(drop=True)
+            st.subheader("📈 Advanced Stats")
+            st.dataframe(
+                adv_summary_for_table[["week", "Total", "Total_3wk_MA", "Total_pct_change"]],
+                height=150
+            )
 
-        # CSV with moving average and % change
-        summary_for_csv = summary.copy()
-        summary_for_csv["Total_3wk_MA"] = adv_summary["Total_3wk_MA"]
-        summary_for_csv["Total_pct_change"] = adv_summary["Total_pct_change"]
-        csv_summary = summary_for_csv.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
+            # --- Show chart with moving average & % change
+            fig = show_chart(summary)
+                # now i removed the streamlit logic from show_chart I should rename it to generate_chart or similar
+            st.pyplot(fig)
 
-        csv_full = df.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
+            # Button styling
+            st.markdown("""
+                <style>
+                div.stButton > button {
+                    background-color: #4CAF50 !important;
+                    color: white !important;
+                    font-weight: bold;
+                    height: 40px;
+                    width: 140px;
+                    border-radius: 5px;
+                    border: none;
+                    margin: 0px;
+                }
+                div.stButton > button:hover {
+                    background-color: #45a049 !important;
+                }
+                div.stButton > button:focus {
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
 
-st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
-st.write("Dash board created by T Cubed - tghughes@gmail.com")
+            # above can be moved to a fucntion i think
+            ########################################
+            # put new debuggin st.writes here if needed
+            ########################################
+            # st.write(df)  # Example debug line
+            # st.write(summary)
+            # st.write(adv_summary)
+            # st.write("this is fig printed  ido not know what fig is:")
+            # st.write("fig object type:", type(fig))
+            # st.write(fig)
+            ########################################
 
-# Message box
-if message:
-    st.markdown("Status Message")
-    st.markdown(f"""
-    <div style="
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 10px;
-        background-color: #f9f9f9;
-        font-family: monospace;
-        font-size: 50%;
-        white-space: pre-wrap;
-        line-height: 1.4;
-    ">
-{message}
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("No update message found yet.")
+            # --- Downloads ---
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=200)
+            buf.seek(0)
+            st.download_button("⬇️ Download Chart as PNG", buf, "weekly_chart.png", "image/png")
+
+            # CSV with moving average and % change
+            summary_for_csv = summary.copy()
+            summary_for_csv["Total_3wk_MA"] = adv_summary["Total_3wk_MA"]
+            summary_for_csv["Total_pct_change"] = adv_summary["Total_pct_change"]
+            csv_summary = summary_for_csv.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download Weekly Summary (CSV)", csv_summary, "visa_summary.csv", "text/csv")
+
+            csv_full = df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download Full Application Data (CSV)", csv_full, "visa_decisions_full.csv", "text/csv")
+
+    st.write("Data sourced from: https://www.irishimmigration.ie/south-africa-visa-desk/#tourist")
+    st.write("Dash board created by T Cubed - tghughes@gmail.com")
+
+    # Message box
+    if message:
+        st.markdown("Status Message")
+        st.markdown(f"""
+        <div style="
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            font-size: 50%;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        ">
+    {message}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("No update message found yet.")
+
+def run_cli():
+    db_mtime = os.path.getmtime(DB_PATH)
+    msg_mtime = os.path.getmtime(MSG_PATH)
+    dash_mtime = os.path.getmtime(DASHBOARD_PATH)
+    df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
+    summary = compute_stats(df)
+    fig = show_chart(summary)
+
+    print(summary)
+    fig.savefig(f"weekly_summary_{datetime.now().strftime('%Y-%m-%d')}.png")
+
+
+if __name__ == "__main__":
+    run_cli()
+
+
