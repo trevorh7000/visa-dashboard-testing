@@ -1,14 +1,15 @@
-# import streamlit as st
-# import streamlit.components.v1 as components
-from turtle import st
+
+
+import streamlit as st
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
 import re
 from datetime import datetime  # CHANGED / NEW: ensure datetime imported
 import os
-
+import streamlit.components.v1 as components
 import io
+import sys
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(__file__)
@@ -155,9 +156,6 @@ def show_chart(summary, window=8):
 def main():
     """Set up Streamlit page configuration and styles and all the output."""
     
-    import streamlit as st
-    import streamlit.components.v1 as components
-
     st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
     st.markdown("""
         <style>
@@ -301,18 +299,24 @@ def main():
         st.info("No update message found yet.")
 
 def run_cli():
+    from send_email import send_figure_email
     db_mtime = os.path.getmtime(DB_PATH)
     msg_mtime = os.path.getmtime(MSG_PATH)
     dash_mtime = os.path.getmtime(DASHBOARD_PATH)
+
     df, message = load_data(DB_PATH, MSG_PATH, db_mtime, msg_mtime, dash_mtime)
     summary = compute_stats(df)
     fig = show_chart(summary)
 
-    print(summary)
-    fig.savefig(f"weekly_summary_{datetime.now().strftime('%Y-%m-%d')}.png")
+    # Send email with chart
+    send_figure_email(fig)
+
+    # print(summary)
+    # fig.savefig(f"weekly_summary_{datetime.now().strftime('%Y-%m-%d')}.png")
 
 
 if __name__ == "__main__":
-    run_cli()
-
-
+    if "-c" in sys.argv:
+        run_cli()
+    else:
+        main()
