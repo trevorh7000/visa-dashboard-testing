@@ -20,7 +20,7 @@ DASHBOARD_PATH = os.path.join(BASE_DIR, "dashboard.py")
 
 
 # --- Load data ---
-def load_data(db_path, msg_path, db_mtime, msg_mtime, dash_mtime):
+def load_data(db_path, msg_path, db_mtime=None, msg_mtime=None, dash_mtime=None):
     conn = sqlite3.connect(db_path) # cache buster added Tuesday Jan 27 as i pull out my hair
     df = pd.read_sql_query("SELECT app_number, decision, week, start_date, end_date FROM decisions", conn)  # CHANGED / NEW: include start_date
     conn.close()
@@ -83,12 +83,16 @@ def show_chart(summary, window=8):
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        left_col, right_col = st.columns([1, 1])
+        left_col, right_col, refresh_col = st.columns([1, 1, 1])
         with left_col:
             back_clicked = st.button("<< Back")
         with right_col:
             forward_clicked = st.button("Forward >>")
-
+        with refresh_col:
+            # Refresh button next to Back/Forward
+            if st.button("🔄 Refresh Data"):
+                df, message = load_data(DB_PATH, MSG_PATH)
+    
     if back_clicked:
         st.session_state.start_idx = max(0, st.session_state.start_idx - window)
     if forward_clicked:
@@ -155,7 +159,7 @@ def show_chart(summary, window=8):
 # === MAIN APP ===
 def main():
     """Set up Streamlit page configuration and styles and all the output."""
-    
+
     st.set_page_config(page_title="Visa Decisions Dashboard", layout="wide")
     st.markdown("""
         <style>
